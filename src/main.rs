@@ -169,8 +169,6 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
                 sha,
                 ga_label,
             ));
-
-            break;
         }
 
         release_list
