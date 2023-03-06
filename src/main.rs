@@ -123,7 +123,15 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
             let os_selector = Selector::parse("a.build-title").unwrap();
             let ga_label = match element.select(&os_selector).next() {
                 Some(o) => {
-                    o.value().attr("ga_label").unwrap().to_string().to_lowercase()
+                    let ga_label = o.value().attr("ga_label").unwrap().to_string().to_lowercase();
+                    
+                    // There are some invisible elements that are just links to sha256 hashes
+                    // We don't need these so we just continue to the next element
+                    if ga_label.contains("sha256") {
+                        continue;
+                    }
+
+                    ga_label
                 },
                 None => continue,
             };
@@ -161,6 +169,8 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
                 sha,
                 ga_label,
             ));
+
+            break;
         }
 
         release_list
@@ -174,7 +184,7 @@ pub fn scrape(tag: String) -> CustomBlenderReleaseList {
         .unwrap();
     let document = Html::parse_document(&data);
 
-    let download_selector = Selector::parse(".builds-list li").unwrap();
+    let download_selector = Selector::parse(".builds-list > li").unwrap();
     let elements = document
         .select(&download_selector)
         .collect::<Vec<ElementRef>>();
