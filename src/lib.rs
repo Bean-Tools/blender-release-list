@@ -1,12 +1,15 @@
 use serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
+use ts_rs::TS;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(TS)]
+#[ts(export)]
 pub struct BlenderRelease {
     pub version: Vec<i8>,
     pub version_detail: String,
-    pub download_link_installer: String,
-    pub download_link_archive: String,
+    pub download_link: String,
+    pub download_type: String,
     pub download_size: String,
     pub release_date: NaiveDateTime,
     pub tag: String,
@@ -20,8 +23,8 @@ impl BlenderRelease {
     pub fn new(
         version: Vec<i8>,
         version_detail: String,
-        download_link_installer: String,
-        download_link_archive: String,
+        download_link: String,
+        download_type: String,
         download_size: String,
         release_date: NaiveDateTime,
         tag: String,
@@ -33,8 +36,8 @@ impl BlenderRelease {
         BlenderRelease {
             version,
             version_detail,
-            download_link_installer,
-            download_link_archive,
+            download_link,
+            download_type,
             download_size,
             release_date,
             tag,
@@ -47,6 +50,8 @@ impl BlenderRelease {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[derive(TS)]
+#[ts(export)]
 pub struct BlenderReleaseList {
     pub releases: Vec<BlenderRelease>,
 }

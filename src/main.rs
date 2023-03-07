@@ -27,13 +27,6 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
             // We use the select() method to get the first element that matches the selector
             // If the element is not found, we continue to the next element in the list
 
-            // Get the build meta div element
-            let build_meta_selector = Selector::parse("div.build-meta").unwrap();
-            let build_meta = match element.select(&build_meta_selector).next() {
-                Some(build_meta) => build_meta,
-                None => continue,
-            };
-
             // Extract the build detail element from the ul element with the class "build-details" inside the parent element
             let build_details_selector = Selector::parse("ul.build-details").unwrap();
             let build_details = match element.select(&build_details_selector).next() {
@@ -47,16 +40,19 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
 
             // Extract the download link from the href attribute of the first a element in the li element
             let download_installer_selector = Selector::parse("a:first-child").unwrap();
-            let download_link_installer = match element.select(&download_installer_selector).next()
+            let download_link = match element.select(&download_installer_selector).next()
             {
-                Some(download_link) => download_link.value().attr("href").unwrap().to_string(),
+                Some(link) => link.value().attr("href").unwrap().to_string(),
                 None => continue,
             };
 
-            // Extract the download link for the build archive from the build meta element
-            let download_archive_selector = Selector::parse("a").unwrap();
-            let download_link_archive = match build_meta.select(&download_archive_selector).next() {
-                Some(download_link) => download_link.value().attr("href").unwrap().to_string(),
+            // Extract the archive type for the build from the build meta element
+            let download_type_selector = Selector::parse("li[title='File extension']").unwrap();
+            let download_type = match element.select(&download_type_selector).next() {
+                Some(download_type) => {
+                    println!("{:?}", download_type.text().collect::<String>());
+                    download_type.text().collect::<String>()
+                },
                 None => continue,
             };
 
@@ -68,7 +64,7 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
             };
 
             // Extract the version number and build details from the filename of the download link
-            let filename = download_link_installer
+            let filename = download_link
                 .split("/")
                 .last()
                 .unwrap()
@@ -159,8 +155,8 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
             release_list.0.releases.push(BlenderRelease::new(
                 version,
                 version_detail,
-                download_link_installer,
-                download_link_archive,
+                download_link,
+                download_type,
                 download_size,
                 release_date,
                 tag,

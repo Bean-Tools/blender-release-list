@@ -1,6 +1,6 @@
 [package]
 name = "blender-beans-scraper"
-version = "0.1.0"
+version = "0.2.0"
 description = "Aggregates a list of Blender downloads from the Blender website."
 authors = ["izzy"]
 license = "GPL-3.0-or-later"
@@ -22,3 +22,4 @@ serde_json = "1.0.93"
 reqwest = { version = "0.11.14", features = ["blocking"] }
 scraper = "0.14.0"
 chrono = { version = "0.4.23", features = ["serde"] }
+ts-rs = { version = "6.2.1", features = ["chrono-impl"] }
