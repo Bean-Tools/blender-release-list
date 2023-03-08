@@ -1,7 +1,7 @@
 // blender_org::scrape() returns a Vec<Version> , which is a list of versions of blender. Each version has a version number, a download link, and a release date.
 // The version number is a String, the download link is a String, and the release date is a chrono::NaiveDate.
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime, Utc};
 use scraper::{ElementRef, Html, Selector};
 use std::collections::HashMap;
 
@@ -40,8 +40,7 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
 
             // Extract the download link from the href attribute of the first a element in the li element
             let download_installer_selector = Selector::parse("a:first-child").unwrap();
-            let download_link = match element.select(&download_installer_selector).next()
-            {
+            let download_link = match element.select(&download_installer_selector).next() {
                 Some(link) => link.value().attr("href").unwrap().to_string(),
                 None => continue,
             };
@@ -49,10 +48,7 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
             // Extract the archive type for the build from the build meta element
             let download_type_selector = Selector::parse("li[title='File extension']").unwrap();
             let download_type = match element.select(&download_type_selector).next() {
-                Some(download_type) => {
-                    println!("{:?}", download_type.text().collect::<String>());
-                    download_type.text().collect::<String>()
-                },
+                Some(download_type) => download_type.text().collect::<String>(),
                 None => continue,
             };
 
@@ -64,11 +60,7 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
             };
 
             // Extract the version number and build details from the filename of the download link
-            let filename = download_link
-                .split("/")
-                .last()
-                .unwrap()
-                .to_string();
+            let filename = download_link.split("/").last().unwrap().to_string();
             let version_raw = match filename.split("-").nth(1) {
                 Some(version) => version.to_string(),
                 None => continue,
@@ -113,14 +105,19 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
             let sha_selector = Selector::parse("a.sha").unwrap();
             let sha = match element.select(&sha_selector).next() {
                 Some(sha) => sha.value().attr("href").unwrap().to_string(),
-                None => "".to_string()
+                None => "".to_string(),
             };
 
             let os_selector = Selector::parse("a.build-title").unwrap();
             let ga_label = match element.select(&os_selector).next() {
                 Some(o) => {
-                    let ga_label = o.value().attr("ga_label").unwrap().to_string().to_lowercase();
-                    
+                    let ga_label = o
+                        .value()
+                        .attr("ga_label")
+                        .unwrap()
+                        .to_string()
+                        .to_lowercase();
+
                     // There are some invisible elements that are just links to sha256 hashes
                     // We don't need these so we just continue to the next element
                     if ga_label.contains("sha256") {
@@ -128,10 +125,10 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
                     }
 
                     ga_label
-                },
+                }
                 None => continue,
             };
-            
+
             let os_name: &str;
             if ga_label.contains(&"windows") {
                 os_name = "windows";
@@ -143,11 +140,25 @@ impl From<Vec<ElementRef<'_>>> for CustomBlenderReleaseList {
                 os_name = "unknown";
             }
 
+            let build_platform = element
+                .select(
+                    &Selector::parse(".build-meta span.build-architecture[title='Architecture']")
+                        .unwrap(),
+                )
+                .next()
+                .unwrap()
+                .text()
+                .collect::<String>()
+                .to_lowercase();
+
             let os_arch: &str;
-            if ga_label.contains(&"64bit") {
-                os_arch = "64bit";
-            } else if ga_label.contains(&"32bit") {
-                os_arch = "32bit";
+            if build_platform == "windows x64"
+                || build_platform == "macos intel"
+                || build_platform == "linux x64"
+            {
+                os_arch = "x86_64";
+            } else if build_platform == "macos apple silicon" {
+                os_arch = "arm64";
             } else {
                 os_arch = "unknown";
             }
@@ -187,8 +198,145 @@ pub fn scrape(tag: String) -> CustomBlenderReleaseList {
     download_list
 }
 
+pub fn scrape_stable() -> CustomBlenderReleaseList {
+    let data = reqwest::blocking::get("https://www.blender.org/download/")
+        .unwrap()
+        .text()
+        .unwrap();
+    let document = Html::parse_document(&data);
+
+    let download_selector = Selector::parse("#menu-other-platforms li.os").unwrap();
+
+    let elements = document
+        .select(&download_selector)
+        .collect::<Vec<ElementRef>>();
+
+    let mut releases = vec![];
+
+    for element in elements {
+        let download_size = match element
+            .select(&Selector::parse("span.size").unwrap())
+            .next()
+        {
+            Some(size) => size.text().collect::<String>(),
+            None => continue,
+        };
+
+        let download_link = element
+            .select(&Selector::parse("a").unwrap())
+            .next()
+            .unwrap()
+            .value()
+            .attr("href")
+            .unwrap()
+            .to_string();
+
+        let mut link_split = download_link.split("/");
+        let file_name = link_split.nth(link_split.clone().count() - 2).unwrap();
+        let version = match file_name.split("-").nth(1) {
+            Some(version) => {
+                let v = version.split(".").collect::<Vec<&str>>();
+                vec![
+                    v[0].parse::<i8>().unwrap(),
+                    v[1].parse::<i8>().unwrap(),
+                    v[2].parse::<i8>().unwrap(),
+                ]
+            }
+            None => continue,
+        };
+
+        let os_name: &str;
+        let release_date_selector: Selector;
+
+        if element.value().attr("class").unwrap().contains("windows") {
+            os_name = "windows";
+        } else if element.value().attr("class").unwrap().contains("linux") {
+            os_name = "linux";
+        } else if element.value().attr("class").unwrap().contains("mac") {
+            os_name = "mac";
+        } else {
+            os_name = "unknown";
+        }
+
+        // Get the arch from the build span
+        let arch_raw = match element
+            .select(&Selector::parse("span.build").unwrap())
+            .next()
+        {
+            Some(arch) => arch.text().collect::<String>(),
+            None => "".into(),
+        };
+
+        let os_arch: &str;
+        let sha_selector: Selector;
+        if arch_raw == "Apple Silicon" {
+            os_arch = "arm64";
+            release_date_selector =
+                Selector::parse("#menu-info-macos-apple-silicon > small").unwrap();
+            sha_selector =
+                Selector::parse("#menu-info-macos-apple-silicon > small.checksum a").unwrap();
+        } else {
+            if os_name == "linux" {
+                release_date_selector = Selector::parse("#menu-info-linux > small").unwrap();
+                sha_selector = Selector::parse("#menu-info-linux > small.checksum a").unwrap();
+            } else if os_name == "darwin" {
+                release_date_selector = Selector::parse("#menu-info-macos > small").unwrap();
+                sha_selector = Selector::parse("#menu-info-macos > small.checksum a").unwrap();
+            } else {
+                release_date_selector = Selector::parse("#menu-info-windows > small").unwrap();
+                sha_selector = Selector::parse("#menu-info-windows > small.checksum a").unwrap();
+            }
+            os_arch = "x86_64";
+        }
+
+        let sha256 = match document.select(&sha_selector).nth(1) {
+            Some(sha) => sha.value().attr("href").unwrap().to_string(),
+            None => "".to_string(),
+        };
+
+        // Get the release date from the menu
+        let release_date = match document.select(&release_date_selector).next() {
+            Some(release_date) => NaiveDate::parse_from_str(
+                &release_date.text().collect::<String>(),
+                "Released on %B %d, %Y · ",
+            )
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap(),
+            None => Utc::now().naive_utc(),
+        };
+
+        // Extract the file type from the last part of the download link
+        let download_type = match download_link.split(".").last() {
+            Some(download_type) => download_type
+                .to_string()
+                .strip_suffix("/")
+                .unwrap()
+                .to_string(),
+            None => "".into(),
+        };
+
+        releases.push(BlenderRelease {
+            os: os_name.into(),
+            download_link: download_link,
+            version: version,
+            download_size: download_size,
+            sha256: sha256,
+            arch: os_arch.into(),
+            download_type: download_type,
+            ga_label: "".into(),
+            release_date: release_date,
+            tag: "current-stable".into(),
+            version_detail: "".into(),
+        });
+    }
+
+    CustomBlenderReleaseList { 0: BlenderReleaseList { releases: releases } }
+}
+
 fn main() {
     let download_list = HashMap::from([
+        ("stable", scrape_stable()),
         ("daily", scrape("daily".to_string())),
         ("experimental", scrape("experimental".to_string())),
         ("patch", scrape("patch".to_string())),
