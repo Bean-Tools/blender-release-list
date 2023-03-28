@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2023 Bean.Tools <github@bean.tools>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "blender-beans-scraper"
+version = "0.2.0"
+description = "Aggregates a list of Blender downloads from the Blender website."
+authors = ["izzy"]
+license = "GPL-3.0-or-later"
+repository = ""
+edition = "2021"
+
+[lib]
+name = "blender_beans_scraper"
+path = "src/lib.rs"
+
+[[bin]]
+name = "blender-beans-scraper"
+path = "src/main.rs"
+doc = false
+
+[dependencies]
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.93"
+reqwest = { version = "0.11.14", features = ["blocking"] }
+scraper = "0.14.0"
+chrono = { version = "0.4.23", features = ["serde"] }
+ts-rs = { version = "6.2.1", features = ["chrono-impl"] }

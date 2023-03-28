@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2023 Bean.Tools <github@bean.tools>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Auto detect text files and perform LF normalization
+* text=auto

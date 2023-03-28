@@ -1,0 +1,9 @@
+{
+  "name": "blender-release-list",
+  "version": "1.0.0",
+  "main": "bindings/index.ts",
+  "repository": "https://github.com/Bean-Tools/blender-release-list.git",
+  "author": "Izzy <360964+izzy@users.noreply.github.com>",
+  "license": "gpl-3.0+",
+  "private": true
+}
